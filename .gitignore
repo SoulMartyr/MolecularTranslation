@@ -1,2 +1,9 @@
-/data/bms-molecular-translation/
+/data/
 /.idea/
+/.ipynb_checkpoints/
+/utils/.ipynb_checkpoints/
+/__pycache__/
+/utils/__pycache__/
+/net/__pycache__/
+/net/optim/__pycache__/
+/net/model/__pycache__/

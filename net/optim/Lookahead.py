@@ -1,14 +1,11 @@
 import itertools as it
 
-from torch.optim import SGD
 from torch.optim.optimizer import Optimizer
 
 
 class Lookahead(Optimizer):
-    def __init__(self, optimizer=SGD, alpha=0.5, k=5):
+    def __init__(self, optimizer, alpha=0.5, k=5):
 
-        if not issubclass(optimizer, Optimizer):
-            raise ValueError("Optimizer Invaild: {}".format(optimizer))
         if not 0.0 <= alpha <= 1.0:
             raise ValueError("Slow Update Rate Invaild: {}".format(alpha))
         if not k >= 1:
@@ -24,7 +21,7 @@ class Lookahead(Optimizer):
         # slow weights don't need to calculate gradient
         self.slow_weights = [[param.clone().detach() for param in param_group['params']] for param_group in
                              self.param_groups]
-        for w in it.chain(self.slow_weights):
+        for w in it.chain(*self.slow_weights):
             w.requires_grad = False
         self.state = optimizer.state
 
@@ -41,6 +38,6 @@ class Lookahead(Optimizer):
             for fast_weight, slow_weight in zip(param_group["params"], slow_weights):
                 if fast_weight.grad is None:
                     continue
-                slow_weight.add_(fast_weight.data - slow_weight.data, alpha=self.alpha)
-                fast_weight.copy_(slow_weight.data)
+                slow_weight.data.add_(fast_weight.data - slow_weight.data, alpha=self.alpha)
+                fast_weight.data.copy_(slow_weight.data)
         return loss
