@@ -76,15 +76,18 @@ else:
     start_epoch = 0
 
 optimizer = Lookahead(RAdam(filter(lambda x: x.requires_grad, net.parameters()), lr=learning_rate), alpha=0.5, k=5)
-
 Util.print_hint("Load Net Success")
 
+Util.print_msg_head(epoch_num, batch_size)
 iteration = start_iteration
 epoch = start_epoch
 rate = 0
-Util.print_msg_head(epoch_num, batch_size)
 while epoch < epoch_num:
     for _, batch in enumerate(train_loader):
+
+        if hasattr(torch.cuda, 'empty_cache'):
+            torch.cuda.empty_cache()
+
         if iteration % save_iteration == 0 and iteration != start_iteration:
             torch.save({
                 'iteration': iteration,
@@ -98,14 +101,17 @@ while epoch < epoch_num:
         batch_size = len(batch['index'])
         image = batch['image'].cuda()
         sequence = batch['sequence'].cuda()
-
+        length = batch['length']
         net.train()
         optimizer.zero_grad()
 
         with amp.autocast():
-            out = net(image, sequence).cpu()
-            train_loss = DataUtil.cross_entropy_loss_cuda(out, sequence)
-            train_accuracy = np.array([train_loss.item(), DataUtil.calculate_edit_distance(out, sequence, tokenizer)])
+            out = net(image, sequence)
+            train_loss = DataUtil.cross_entropy_loss_cuda(out, sequence, length)
+            sequence = sequence.detach().cpu().numpy()
+            predict = out.detach().cpu().numpy().argmax(-1)
+            train_accuracy = np.array(
+                [train_loss.item(), DataUtil.calculate_edit_distance(predict, sequence, tokenizer)])
 
         if iteration % log_iteration == 0 and iteration != start_iteration:
             learning_rate = Util.get_learning_rate(optimizer)

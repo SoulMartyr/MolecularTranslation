@@ -8,6 +8,9 @@ import numpy as np
 import pandas as pd
 import torch
 from albumentations import Compose, OneOf, GaussNoise, MotionBlur, MedianBlur, Blur
+from imgaug import augmenters as iaa
+from rdkit import Chem
+from rdkit import RDLogger
 from torch.nn import functional as F
 from torch.nn.utils.rnn import pack_padded_sequence
 from torch.utils.data import Dataset
@@ -15,6 +18,8 @@ from torch.utils.data.sampler import Sampler
 from tqdm import tqdm
 
 from utils.Util import spilt_formula_layer, spilt_other_layers
+
+RDLogger.DisableLog('rdApp.*')
 
 tqdm.pandas(desc='apply')
 
@@ -112,16 +117,8 @@ def padding(sequence, value, max_length):
 
 
 def vague_augment():
-    return Compose([
-        OneOf([
-            # 高斯噪点
-            GaussNoise(),
-            # 模糊相关操作
-            MotionBlur(p=.2),
-            MedianBlur(blur_limit=3, p=0.1),
-            Blur(blur_limit=3, p=0.1),
-        ], p=1),
-    ], p=1.)
+    return iaa.OneOf([iaa.SaltAndPepper(0.01), iaa.SaltAndPepper(0.005), iaa.AdditiveGaussianNoise(0.01),
+                      iaa.AdditiveGaussianNoise(0.005)])
 
 
 def rotate_augment(image, orientation):
@@ -165,8 +162,7 @@ class MolecularDataset(Dataset):
         if self.mode == "test":
             image = rotate_augment(image, image_info.orientation)
         if self.mode == "train":
-            vague = vague_augment()
-            image = vague(image=image)['image']
+            image = vague_augment().augment_image(image)
         image = resize_augment(image)
 
         info = {
@@ -280,9 +276,6 @@ def calculate_edit_distance(predict, truth, tokenizer):
     truth = tokenizer.sequences_to_texts(truth)
     for p, t in zip(predict, truth):
         s = Levenshtein.distance(p, t)
-        if s > 1000:
-            print(p)
-            print(t)
         score.append(s)
     score = np.array(score)
     return score.mean()
@@ -294,12 +287,11 @@ def valid(valid_loader, net):
     valid_num = 0
     tokenizer = load_tokenizer()
     net.eval()
-    for idx, batch in enumerate(valid_loader):
+    for _, batch in enumerate(valid_loader):
         batch_size = len(batch['index'])
         image = batch['image'].cuda()
         sequence = batch['sequence'].cuda()
         length = batch['length']
-
         with torch.no_grad():
             result = net(image, sequence)
             probability = F.softmax(result, -1)
@@ -307,7 +299,7 @@ def valid(valid_loader, net):
         valid_num += batch_size
         valid_probability.append(probability.data.cpu().numpy())
         valid_truth.append(sequence.data.cpu().numpy())
-        print(len(valid_truth))
+
     assert (valid_num == len(valid_loader.sampler))
 
     probability = np.concatenate(valid_probability)
@@ -326,20 +318,30 @@ def valid(valid_loader, net):
     return [loss, edit_distance]
 
 
+def normalize_inchi(inchi):
+    try:
+        mol = Chem.MolFromInchi(inchi)
+        return inchi if (mol is None) else Chem.MolToInchi(mol)
+    except:
+        return inchi
+
+
 def predict(test_loader, net):
     tokenizer = load_tokenizer()
     result = []
     test_num = 0
     for t, batch in enumerate(test_loader):
         batch_size = len(batch['image'])
-        image = batch['image'].cuda()
-
-        net.eval()
-        with torch.no_grad():
-            out = net.forward_predict(image)
-            out = out.data.cpu().numpy()
-            out = tokenizer.predict(out)
-            result.extend(out)
+        image_batch = batch['image'].cuda()
+        for idx in range(batch_size):
+            image = image_batch[idx, :]
+            net.eval()
+            with torch.no_grad():
+                out = net.forward_predict(image)
+                out = out.data.cpu().numpy()
+                out = tokenizer.predict(out)
+                out = normalize_inchi(out)
+                result.extend(out)
 
         test_num += batch_size
 

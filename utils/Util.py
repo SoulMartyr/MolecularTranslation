@@ -90,7 +90,7 @@ def print_msg_head(epoch_num, batch_size):
     print('batch_size = {}\n'.format(batch_size))
     print('|---------------Info----------------|------Train------|------Valid------|\n')
     print('| time       epoch    iter   lr     | loss     dist   | loss     dist   |\n')
-    print(' -------------------------------------------------------------- \n')
+    print('-------------------------------------------------------------------------\n')
 
 
 def print_msg(epoch, iteration, lr, train_accuracy, valid_accuracy, save_iteration):
