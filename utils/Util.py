@@ -98,10 +98,12 @@ def print_msg(epoch, iteration, lr, train_accuracy, valid_accuracy, save_iterati
         sign = '*'
     else:
         sign = ' '
-    valid_accuracy = ['' if elem is None else elem for elem in valid_accuracy]
+    train_accuracy = ['None' if elem is None else str(elem) for elem in train_accuracy]
+    valid_accuracy = ['None' if elem is None else str(elem) for elem in valid_accuracy]
+    iteration = str((iteration % 1000)) + 'k'
     print("| {:<8}   {:<6}   {:<4}   {:<6} | {:<6}   {:<6} | {:<6}   {:<6} |".format(get_time(), str(epoch)[:6],
-                                                                                     str(str(iteration) + sign)[:4],
-                                                                                     str(lr)[:5],
+                                                                                     str(iteration + sign)[:4],
+                                                                                     str(lr)[:6],
                                                                                      str(train_accuracy[0])[:6],
                                                                                      str(train_accuracy[1])[:6],
                                                                                      str(valid_accuracy[0])[:6],

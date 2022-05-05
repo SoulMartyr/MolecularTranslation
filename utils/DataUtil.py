@@ -7,7 +7,6 @@ import cv2
 import numpy as np
 import pandas as pd
 import torch
-from albumentations import Compose, OneOf, GaussNoise, MotionBlur, MedianBlur, Blur
 from imgaug import augmenters as iaa
 from rdkit import Chem
 from rdkit import RDLogger
@@ -117,8 +116,29 @@ def padding(sequence, value, max_length):
 
 
 def vague_augment():
-    return iaa.OneOf([iaa.SaltAndPepper(0.01), iaa.SaltAndPepper(0.005), iaa.AdditiveGaussianNoise(0.01),
-                      iaa.AdditiveGaussianNoise(0.005)])
+    return iaa.OneOf([iaa.Noop(), iaa.SaltAndPepper(0.001), iaa.SaltAndPepper(0.002)])
+
+
+def pad_and_resize_augment(image):
+    image = 255 - image
+
+    image = image[0 < image.sum(axis=1), :]
+    image = image[:, 0 < image.sum(axis=0)]
+
+    h, w = image.shape
+    max_len = max(h, w)
+    out = np.zeros((max_len, max_len), dtype=np.uint8)
+
+    center = max_len // 2
+    center_x, center_y = w // 2, h // 2
+    y = center - center_y
+    x = center - center_x
+
+    out[y:y + h, x:x + w] = image
+
+    out = iaa.Resize((image_size, image_size)).augment_image(out)
+    out = 255 - out
+    return out
 
 
 def rotate_augment(image, orientation):
@@ -128,11 +148,6 @@ def rotate_augment(image, orientation):
         image = np.rot90(image, 1)
     elif orientation == 3:
         image = np.rot90(image, 2)
-    return image
-
-
-def resize_augment(image):
-    image = cv2.resize(image, dsize=(image_size, image_size), interpolation=cv2.INTER_LINEAR)
     return image
 
 
@@ -163,7 +178,7 @@ class MolecularDataset(Dataset):
             image = rotate_augment(image, image_info.orientation)
         if self.mode == "train":
             image = vague_augment().augment_image(image)
-        image = resize_augment(image)
+        image = pad_and_resize_augment(image)
 
         info = {
             'index': index,

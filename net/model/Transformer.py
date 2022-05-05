@@ -30,8 +30,8 @@ class CalAttention(nn.Module):
     def forward(self, query, key, value, self_attn_mask):
         score = torch.matmul(query, key.transpose(-1, -2)) / np.sqrt(
             self.attn_dim)
-        score = score.type(torch.float32)
-        score.masked_fill_(self_attn_mask, -1e9)
+
+        score.masked_fill_(self_attn_mask, -6e4)
         attention = nn.Softmax(dim=-1)(score)
 
         association_degree = torch.matmul(attention, value)
@@ -119,12 +119,12 @@ class DecoderLayer(nn.Module):
     def __init__(self, embed_dim, attn_dim, ffn_dim, head_num):
         super(DecoderLayer, self).__init__()
         self.self_attn = MultiHeadAttention(embed_dim, attn_dim, head_num)
-        self.encoder_attn = MultiHeadAttention(embed_dim, attn_dim, head_num)
+        self.decoder_attn = MultiHeadAttention(embed_dim, attn_dim, head_num)
         self.ffn = FeedForward(embed_dim, ffn_dim)
 
     def forward(self, inputs, encoder_outputs, self_attn_mask, encoder_self_attn_mask):
         outputs = self.self_attn(inputs, inputs, inputs, self_attn_mask)
-        outputs = self.encoder_attn(outputs, encoder_outputs, encoder_outputs, encoder_self_attn_mask)
+        outputs = self.decoder_attn(outputs, encoder_outputs, encoder_outputs, encoder_self_attn_mask)
         outputs = self.ffn(outputs)
         return outputs
 

@@ -1,5 +1,4 @@
 from torch import nn
-from torch.nn import Module
 
 
 def conv1x1(in_planes, out_planes, stride=1):
@@ -10,7 +9,7 @@ def conv3x3(in_planes, out_planes, stride=1, padding=0):
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride, padding=padding)
 
 
-class Bottleneck(Module):
+class Bottleneck(nn.Module):
     expansion = 4
 
     def __init__(self, in_planes, base_planes, stride=1, padding=1, downsample=None):
@@ -48,7 +47,7 @@ class Bottleneck(Module):
         return out
 
 
-class ResNet(Module):
+class ResNet(nn.Module):
     def __init__(self):
         super(ResNet, self).__init__()
         self.layer0 = nn.Sequential(
